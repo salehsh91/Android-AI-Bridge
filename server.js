@@ -163,7 +163,22 @@ function read(chatbot){
 }
 
 
+function wr(chatbot, value) {
 
+    const bot = chatbots[chatbot];
+
+    if (!bot) return false;
+
+    return send("wr", {
+        chatbot,
+        write_selector: bot.inputbox,
+        write_btn: bot.btnsend,
+        btnnosend: bot.btnnosend,
+        read_textbox: bot.textbox,
+        value
+    });
+
+}
 
 
 
@@ -187,13 +202,14 @@ function clickBySelector(selector) {
 
 global.write = write;
 global.read = read;
+global.wr= wr;
 
 global.clickBySelector = clickBySelector;
 
 function run() {
 
     // write("chatgpt", "hello");
-    console.log(read("chatgpt"));
+    console.log(wr("chatgpt"));
     // write("deepseek", "hello");
 }
 
