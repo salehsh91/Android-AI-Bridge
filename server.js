@@ -1,39 +1,224 @@
 const WebSocket = require("ws");
+const fs = require("fs");
+
+const chatbots = JSON.parse(
+    fs.readFileSync("chatbots.json", "utf8")
+);
+
+
+let browser = null;
+
 
 const wss = new WebSocket.Server({
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     port: 8080
 });
 
-console.log("Android AI Bridge Server");
-console.log("ws://0.0.0.0:8080");
+
+console.log("Android AI Bridge");
+console.log("ws://127.0.0.1:8080");
+
+
 
 wss.on("connection", (ws) => {
+
+
+    browser = ws;
+
+
     console.log("Browser Connected");
+
     setTimeout(() => {
-    ws.send(JSON.stringify({
-        type: "eval",
-        code: `
-            // document.body.style.background = "";
-            console.log("Hello from Termux!");
-        `
-    }));
-}, 3000);
-    ws.send(JSON.stringify({
-        type: "hello",
-        message: "Hello from Termux!"
-    }));
+
+        run();
+
+    }, 1000);
 
     ws.on("message", (msg) => {
-        console.log("Browser:", msg.toString());
+
+        console.log(
+            "Browser:",
+            msg.toString()
+        );
+
     });
 
-    setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-                type: "time",
-                time: Date.now()
-            }));
+
+
+    ws.on("close", () => {
+
+        console.log("Browser Disconnected");
+
+        browser = null;
+
+    });
+
+
+
+    ws.on("error", (err) => {
+
+        console.log(
+            "Browser Error:",
+            err
+        );
+
+    });
+
+
+
+    // بعد از اتصال پیام تست ارسال کن
+    setTimeout(() => {
+
+        console.log("Sending hello...");
+
+
+
+
+    }, 1000);
+
+
+
+});
+
+
+
+
+
+function send(type, data = {}) {
+
+
+    if (!browser) {
+
+        console.log(
+            "Browser not connected"
+        );
+
+        return false;
+    }
+
+
+
+    if (browser.readyState !== WebSocket.OPEN) {
+
+        console.log(
+            "Socket closed"
+        );
+
+        return false;
+
+    }
+
+
+
+    const packet = {
+        type,
+        ...data
+    };
+
+
+
+    console.log(
+        "Send:",
+        packet
+    );
+
+
+
+    browser.send(
+        JSON.stringify(packet)
+    );
+
+
+    return true;
+
+}
+
+
+
+
+
+function write(chatbot, value) {
+
+    const bot = chatbots[chatbot];
+
+    if (!bot) return false;
+
+    return send("write", {
+        chatbot,
+        selector: bot.inputbox,
+        btn: bot.btnsend,
+        value
+    });
+
+}
+function read(chatbot){
+    const bot = chatbots[chatbot];
+
+    if (!bot) return false;
+
+    return send("read", {
+        chatbot,
+        selector: bot.textbox
+    });
+}
+
+
+
+
+
+
+function clickBySelector(selector) {
+
+
+    return send(
+        "clickBySelector",
+        {
+            selector
         }
-    }, 5000);
+    );
+
+
+}
+
+
+
+
+
+
+global.write = write;
+global.read = read;
+
+global.clickBySelector = clickBySelector;
+
+function run() {
+
+    // write("chatgpt", "hello");
+    console.log(read("chatgpt"));
+    // write("deepseek", "hello");
+}
+
+
+global.run = run;
+
+
+process.on("SIGINT", () => {
+
+
+    console.log("Stopping...");
+
+
+    if (browser) {
+
+        browser.close();
+
+    }
+
+
+    wss.close(() => {
+
+        process.exit();
+
+    });
+
+
 });
