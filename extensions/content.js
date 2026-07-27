@@ -4,6 +4,7 @@ function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
 }
 
+
 function clickById(id) {
     const el = document.getElementById(id);
 
@@ -24,24 +25,29 @@ function clickBySelector(selector) {
     return true;
 }
 
-function write(selector, value, btn) {
+function write(selector, value) {
 
     const el = document.querySelector(selector);
 
     if (!el) {
-
         console.log("Input not found");
-
         return false;
-
     }
+
 
     el.focus();
 
+
+    // ContentEditable (ChatGPT)
     if (el.isContentEditable) {
 
-        document.execCommand("selectAll", false, null);
-        document.execCommand("insertText", false, value);
+        el.innerHTML = "";
+
+        const p = document.createElement("p");
+        p.textContent = value;
+
+        el.appendChild(p);
+
 
         el.dispatchEvent(new InputEvent("input", {
             bubbles: true,
@@ -49,52 +55,192 @@ function write(selector, value, btn) {
             data: value
         }));
 
-    } else {
+    }
 
-        const setter = Object.getOwnPropertyDescriptor(
-            HTMLTextAreaElement.prototype,
-            "value"
-        ).set;
+    // textarea (DeepSeek)
+    else {
+
+        const setter =
+            Object.getOwnPropertyDescriptor(
+                HTMLTextAreaElement.prototype,
+                "value"
+            ).set;
+
 
         setter.call(el, value);
+
 
         el.dispatchEvent(new Event("input", {
             bubbles: true
         }));
-
     }
 
-    setTimeout(() => {
-
-        const button = document.querySelector(btn);
-
-        if (button) {
-
-            button.click();
-
-        }
-
-    }, 500);
 
     return true;
-
 }
 
-function read(selector) {
 
-    const els = document.querySelectorAll(selector);
-    const el = els[els.length - 1];
-    if (!el) return null;
+async function readStable(selector = "div.ds-message", options = {}) {
 
-    return el.innerText || el.textContent || el.value || "";
+    const {
+        timeout = 120000,
+        interval = 1000,
+        stableRounds = 3,
+        oldText = ""
+    } = options;
 
+
+    const start = Date.now();
+
+    let lastText = "";
+    let stable = 0;
+    let started = false;
+
+
+    while (Date.now() - start < timeout) {
+
+
+        const messages = document.querySelectorAll(selector);
+
+
+        if (messages.length) {
+
+            const current = messages[messages.length - 1]
+                .innerText
+                .trim();
+
+            if (current.length < 5) {
+                await sleep(interval);
+                continue;
+            }
+
+            console.log(
+                "Reading:",
+                current.length,
+                "stable:",
+                stable
+            );
+
+
+            // هنوز همان جواب قبلی است
+            if (!started) {
+
+                if (
+                    current.length > 0 &&
+                    current !== oldText
+                ) {
+                    started = true;
+                    lastText = current;
+                }
+
+            } else {
+
+
+                // متن تغییر کرده
+                if (current !== lastText) {
+
+                    lastText = current;
+                    stable = 0;
+
+                }
+
+                // متن ثابت مانده
+                else {
+
+                    stable++;
+
+                    if (stable >= stableRounds) {
+
+                        return current;
+
+                    }
+                }
+            }
+        }
+
+
+        await new Promise(
+            r => setTimeout(r, interval)
+        );
+    }
+
+
+    throw new Error("Message timeout");
 }
-async function WR(wselector, wvalue, wbtn ,btnnosend ,rselector) {
-    write(wselector,wvalue,wbtn);
-    while (document.querySelector(btnnosend)) {
+
+async function read(selector, btnNoSend) {
+    while (document.querySelector(btnNoSend) === null) {
         await sleep(300);
     }
-    return read(rselector);
+
+    const els = document.querySelectorAll(selector);
+
+    if (els.length === 0) {
+        return null;
+    }
+
+    const el = els[els.length - 1];
+
+    return el.innerText ?? el.textContent ?? el.value ?? "";
+}
+
+async function WR(data) {
+
+
+    console.log("WR Start");
+
+
+    const messages =
+        document.querySelectorAll(
+            data.read_selector
+        );
+
+
+    const oldText =
+        messages.length
+            ? messages[messages.length - 1]
+                .innerText
+                .trim()
+            : "";
+
+
+    const ok = write(
+        data.write_selector,
+        data.write_value
+    );
+
+
+    if (!ok) {
+        throw new Error("Write failed");
+    }
+
+
+
+    await sleep(500);
+
+
+    await clickBySelector(
+        data.send_selector
+    );
+
+
+    console.log("Waiting answer...");
+
+
+    const answer = await readStable(
+        data.read_selector,
+        {
+            oldText: oldText,
+            timeout: 180000,
+            stableRounds: 4
+        }
+    );
+
+
+    console.log("Answer:", answer);
+
+
+    return answer;
 }
 
 function run(code) {
@@ -107,91 +253,92 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
 
     console.log("Message:", data);
 
-    try {
+    (async () => {
 
-        switch (data.type) {
+        try {
 
-            case "clickById":
+            switch (data.type) {
 
-                sendResponse({
-                    ok: clickById(data.id)
-                });
+                case "clickById":
 
-                break;
+                    sendResponse({
+                        ok: clickById(data.id)
+                    });
 
-            case "clickBySelector":
+                    break;
 
-                sendResponse({
-                    ok: clickBySelector(data.selector)
-                });
+                case "clickBySelector":
 
-                break;
+                    sendResponse({
+                        ok: clickBySelector(data.selector)
+                    });
 
-            case "write":
+                    break;
 
-                sendResponse({
-                    ok: write(
-                        data.selector,
-                        data.value,
-                        data.btn
-                    )
-                });
+                case "write":
 
-                break;
+                    sendResponse({
+                        ok: write(
+                            data.selector,
+                            data.value,
+                            data.btn
+                        )
+                    });
 
-            case "read":
+                    break;
 
-                sendResponse({
-                    ok: read(
-                        data.selector
-                    )
-                });
+                case "read":
 
-                break;
+                    sendResponse({
+                        ok: true,
+                        text: await readStable(data.selector)
+                    });
 
-            case "eval":
+                    break;
 
-                sendResponse({
-                    ok: true,
-                    result: run(data.code)
-                });
+                case "eval":
 
-                break;
-            case "wr":
+                    sendResponse({
+                        ok: true,
+                        result: run(data.code)
+                    });
 
-                sendResponse({
-                    ok: WR(
-                        data.write_selector,
-                        data.write_value,
-                        data.write_btn,
+                    break;
 
-                        data.btnnosend,
+                case "wr": {
 
-                        data.read_selector
-                    )
-                });
+                    const text = await WR(data);
 
-                break;
+                    sendResponse({
+                        id: data.id,
+                        ok: true,
+                        text
+                    });
 
-            default:
+                    break;
+                }
 
-                sendResponse({
-                    ok: false,
-                    error: "Unknown command"
-                });
+                default:
+
+                    sendResponse({
+                        ok: false,
+                        error: "Unknown command"
+                    });
+
+            }
+
+        } catch (e) {
+
+            console.error(e);
+
+            sendResponse({
+                ok: false,
+                error: e.toString()
+            });
 
         }
 
-    } catch (e) {
-
-        console.error(e);
-
-        sendResponse({
-            ok: false,
-            error: e.toString()
-        });
-
-    }
+    })();
 
     return true;
 

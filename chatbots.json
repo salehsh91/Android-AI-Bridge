@@ -1,13 +1,15 @@
 {
-    "chatgpt":{
-        "inputbox":"#prompt-textarea",
-        "btnsend":"#composer-submit-button",
-        "btnnosend": ".composer-submit-button-color",
-        "textbox": "[data-turn-id-container]"
-    },
-    "deepseek":{
-        "inputbox":"[placeholder='Message DeepSeek']",
-        "btnsend":"div[role='button'].ds-button--primary",
-        "textbox": "[data-turn-id-container]"
-    }
+  "chatgpt": {
+    "inputbox": "#prompt-textarea",
+    "btnsend": "#composer-submit-button",
+    "btnnosend": "[data-testid='stop-button']",
+    "textbox": "[data-turn-id-container]"
+  },
+
+  "deepseek": {
+    "inputbox": "[placeholder='Message DeepSeek']",
+    "btnsend": "div[role='button'].ds-button--primary",
+    "btnnosend": ".ds-button--disabled",
+    "textbox": "div.ds-message"
+  }
 }

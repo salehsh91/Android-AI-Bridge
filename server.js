@@ -1,12 +1,16 @@
-const WebSocket = require("ws");
-const fs = require("fs");
+const WebSocket = require("ws"); const fs = require("fs");
 
 const chatbots = JSON.parse(
     fs.readFileSync("chatbots.json", "utf8")
 );
 
-
 let browser = null;
+
+let browserReadyResolve;
+
+const browserReady = new Promise(resolve => {
+    browserReadyResolve = resolve;
+});
 
 
 const wss = new WebSocket.Server({
@@ -19,131 +23,80 @@ console.log("Android AI Bridge");
 console.log("ws://127.0.0.1:8080");
 
 
-
 wss.on("connection", (ws) => {
-
 
     browser = ws;
 
-
     console.log("Browser Connected");
 
-    setTimeout(() => {
 
-        run();
+    browserReadyResolve();
 
-    }, 1000);
 
     ws.on("message", (msg) => {
 
-        console.log(
-            "Browser:",
-            msg.toString()
-        );
+        const data = JSON.parse(msg);
+
+        if (data.id && waiting.has(data.id)) {
+            waiting.get(data.id)(data);
+            waiting.delete(data.id);
+        }
 
     });
-
-
-
-    ws.on("close", () => {
-
-        console.log("Browser Disconnected");
-
-        browser = null;
-
-    });
-
-
-
-    ws.on("error", (err) => {
-
-        console.log(
-            "Browser Error:",
-            err
-        );
-
-    });
-
-
-
-    // بعد از اتصال پیام تست ارسال کن
-    setTimeout(() => {
-
-        console.log("Sending hello...");
-
-
-
-
-    }, 1000);
-
-
 
 });
 
+
+const waiting = new Map();
+let requestId = 0;
 
 
 
 
 function send(type, data = {}) {
 
+    return new Promise((resolve, reject) => {
 
-    if (!browser) {
+        if (!browser) {
+            reject(new Error("Browser not connected"));
+            return;
+        }
 
-        console.log(
-            "Browser not connected"
-        );
+        if (browser.readyState !== WebSocket.OPEN) {
+            reject(new Error("Socket closed"));
+            return;
+        }
 
-        return false;
-    }
+        const id = ++requestId;
 
+        waiting.set(id, (response) => {
 
+            if (response.ok === false) {
+                reject(new Error(response.error));
+                return;
+            }
 
-    if (browser.readyState !== WebSocket.OPEN) {
+            resolve(response);
 
-        console.log(
-            "Socket closed"
-        );
+        });
 
-        return false;
+        browser.send(JSON.stringify({
+            id,
+            type,
+            ...data
+        }));
 
-    }
-
-
-
-    const packet = {
-        type,
-        ...data
-    };
-
-
-
-    console.log(
-        "Send:",
-        packet
-    );
-
-
-
-    browser.send(
-        JSON.stringify(packet)
-    );
-
-
-    return true;
+    });
 
 }
 
-
-
-
-
-function write(chatbot, value) {
+async function write(chatbot, value) {
 
     const bot = chatbots[chatbot];
 
-    if (!bot) return false;
+    if (!bot) return null;
 
-    return send("write", {
+    return await send("write", {
         chatbot,
         selector: bot.inputbox,
         btn: bot.btnsend,
@@ -151,90 +104,65 @@ function write(chatbot, value) {
     });
 
 }
-function read(chatbot){
+
+async function read(chatbot) {
+
     const bot = chatbots[chatbot];
 
-    if (!bot) return false;
+    if (!bot) return null;
 
-    return send("read", {
+    return await send("read", {
         chatbot,
         selector: bot.textbox
     });
-}
-
-
-function wr(chatbot, value) {
-
-    const bot = chatbots[chatbot];
-
-    if (!bot) return false;
-
-    return send("wr", {
-        chatbot,
-        write_selector: bot.inputbox,
-        write_btn: bot.btnsend,
-        btnnosend: bot.btnnosend,
-        read_textbox: bot.textbox,
-        value
-    });
 
 }
 
+async function wr(chatbot, value) {
 
+    const bot = chatbots[chatbot];
 
-function clickBySelector(selector) {
+    if (!bot) {
+        throw new Error("Chatbot not found");
+    }
 
+    const jsontext = await send("wr", {
+        chatbot,
+        write_selector: bot.inputbox,
+        write_value: value,
+        send_selector: bot.btnsend,
+        read_selector: bot.textbox,
+        btnnosend: bot.btnnosend
+    });
+    const text = jsontext;
+    return text;
 
-    return send(
-        "clickBySelector",
-        {
-            selector
-        }
-    );
+}
 
+async function clickBySelector(selector) {
+
+    return await send("clickBySelector", {
+        selector
+    });
 
 }
 
 
-
-
-
-
-global.write = write;
-global.read = read;
-global.wr= wr;
-
-global.clickBySelector = clickBySelector;
-
-function run() {
-
-    // write("chatgpt", "hello");
-    console.log(wr("chatgpt"));
-    // write("deepseek", "hello");
-}
-
-
-global.run = run;
 
 
 process.on("SIGINT", () => {
 
-
     console.log("Stopping...");
 
-
     if (browser) {
-
         browser.close();
-
     }
 
-
-    wss.close(() => {
-
-        process.exit();
-
-    });
-
+    wss.close(() => process.exit());
 
 });
+
+module.exports = {
+    wr,
+    browserReady
+};
