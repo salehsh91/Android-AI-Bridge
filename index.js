@@ -1,14 +1,22 @@
 const AI = require("./ai");
 const { browserReady } = require("./server");
 
-async function main() {
+
+async function main(){
 
     console.log("Waiting browser...");
 
     await browserReady;
 
-    const Deepseek = new AI("deepseek");
+    console.log("Browser ready");
+
+
     const ChatGPT = new AI("chatgpt");
+    const Deepseek = new AI("deepseek");
+
+    await ChatGPT.init();
+    await Deepseek.init();
+
 
     const lastI = 10;
 
@@ -46,7 +54,10 @@ ${article}
 `);
     }
 
-    console.log(article);
+    console.log(article); 
 }
+
+
+
 
 main().catch(console.error);

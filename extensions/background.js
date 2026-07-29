@@ -1,3 +1,4 @@
+let readyTabs = new Set();
 console.log("Background Started");
 
 let socket = null;
@@ -26,6 +27,25 @@ function connect() {
         const data = JSON.parse(event.data);
 
         let url = "";
+        if (data.type === "ping") {
+            socket.send(JSON.stringify({
+                type: "pong"
+            }));
+            return;
+        }
+
+        if (data.type === "newchat") {
+            const tab = await newTab(data.url);
+
+            socket.send(JSON.stringify({
+                id: data.id,
+                ok: true,
+                tabId: tab.id,
+                url: tab.url
+            }));
+
+            return;
+        }
 
         switch (data.chatbot) {
 
@@ -43,45 +63,72 @@ function connect() {
 
         }
 
-        const tabs = await chrome.tabs.query({
-            url
-        });
-
-        if (!tabs.length) {
-
-            console.log("Tab not found:", url);
-
-            socket.send(JSON.stringify({
-                ok: false,
-                error: "tab not found"
-            }));
-
-            return;
-
+        let targetTabId;
+        if (data.tabid) {
+            targetTabId = data.tabid;
+        } else {
+            // فقط اگر واقعاً tabId نداشتی
         }
 
-        chrome.tabs.sendMessage(
-            tabs[0].id,
-            data,
-            (response) => {
+        if (data.type === "onewr") {
+            targetTabId = data.tabid;
+        } else {
+            const tabs = await chrome.tabs.query({ url });
 
-                if (chrome.runtime.lastError) {
-
-                    console.log(chrome.runtime.lastError.message);
-
-                    socket.send(JSON.stringify({
-                        ok: false,
-                        error: chrome.runtime.lastError.message
-                    }));
-
-                    return;
-
-                }
-
-                socket.send(JSON.stringify(response));
-
+            if (!tabs.length) {
+                socket.send(JSON.stringify({
+                    id: data.id,
+                    ok: false,
+                    error: "Tab not found"
+                }));
+                return;
             }
-        );
+
+            targetTabId = tabs[0].id;
+        } if (data.tabid) {
+            targetTabId = data.tabid;
+        } else {
+            // فقط اگر واقعاً tabId نداشتی
+        }
+
+        console.log("Sending to tab:", targetTabId);
+        console.log("Data:", data);
+
+
+        const tab = await chrome.tabs.get(targetTabId);
+
+        console.log("TAB INFO:", {
+            id: tab.id,
+            url: tab.url,
+            status: tab.status
+        });
+        try {
+            await chrome.scripting.executeScript({
+                target: { tabId: targetTabId },
+                func: () => console.log("Injected OK")
+            });
+
+            console.log("Script can access tab");
+        } catch (e) {
+            console.error("Cannot access tab:", e);
+        }
+        chrome.tabs.sendMessage(targetTabId, data, (response) => {
+
+            if (chrome.runtime.lastError) {
+                console.error("SendMessage Error:", chrome.runtime.lastError);
+
+                socket.send(JSON.stringify({
+                    id: data.id,
+                    ok: false,
+                    error: chrome.runtime.lastError.message
+                }));
+                return;
+            }
+
+            console.log("Response:", response);
+
+            socket.send(JSON.stringify(response));
+        });
 
     };
 
@@ -96,3 +143,107 @@ function connect() {
     socket.onerror = console.error;
 
 }
+
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "contentReady") {
+
+        console.log(
+            "Content Ready:",
+            sender.tab.id
+        );
+
+        readyTabs.add(sender.tab.id);
+
+        return;
+    }
+
+
+    if (message.type === "getTabId") {
+        sendResponse({
+            tabId: sender.tab.id
+        });
+
+        return true;
+    }
+});
+
+async function newTab(chatbotUrl) {
+
+    console.log("Creating new tab:", chatbotUrl);
+
+
+    const tab = await chrome.tabs.create({
+        url: chatbotUrl,
+        active: true
+    });
+
+
+    console.log(
+        "New tab created:",
+        tab.id
+    );
+
+
+    await waitContent(tab.id);
+
+
+    return await chrome.tabs.get(tab.id);
+}
+
+
+
+async function waitContent(tabId) {
+
+    return new Promise((resolve) => {
+
+
+        if (readyTabs.has(tabId)) {
+
+            resolve();
+            return;
+
+        }
+
+
+        const timer = setInterval(() => {
+
+
+            if (readyTabs.has(tabId)) {
+
+                clearInterval(timer);
+
+                console.log(
+                    "Content loaded for:",
+                    tabId
+                );
+
+
+                resolve();
+
+            }
+
+
+        }, 100);
+
+
+
+        // جلوگیری از گیر کردن دائمی
+        setTimeout(() => {
+
+            clearInterval(timer);
+
+            console.log(
+                "Content timeout:",
+                tabId
+            );
+
+            resolve();
+
+        }, 30000);
+
+
+    });
+
+}
+

@@ -32,6 +32,14 @@ wss.on("connection", (ws) => {
 
     browserReadyResolve();
 
+    setInterval(() => {
+        if (browser && browser.readyState === WebSocket.OPEN) {
+            browser.send(JSON.stringify({
+                type: "ping"
+            }));
+        }
+    }, 5000);
+
 
     ws.on("message", (msg) => {
 
@@ -118,7 +126,56 @@ async function read(chatbot) {
 
 }
 
-async function wr(chatbot, value) {
+async function wr(chatbot, value, tabId, url) {
+    const bot = chatbots[chatbot];
+
+    if (!bot) {
+        throw new Error("Chatbot not found");
+    }
+    const jsontext = await send("onewr", {
+        chatbot,
+        write_selector: bot.inputbox,
+        write_value: value,
+        send_selector: bot.btnsend,
+        read_selector: bot.textbox,
+        btnnosend: bot.btnnosend,
+
+        tabid: tabId,
+        url: url
+    });
+
+
+    const text = jsontext;
+    return text;
+}
+
+async function onewr(chatbot, value, tabId, url) {
+
+    const bot = chatbots[chatbot];
+
+    if (!bot) {
+        throw new Error("Chatbot not found");
+    }
+    const jsontext = await send("onewr", {
+        chatbot,
+        write_selector: bot.inputbox,
+        write_value: value,
+        send_selector: bot.btnsend,
+        read_selector: bot.textbox,
+        btnnosend: bot.btnnosend,
+
+        tabid: tabId,
+        url: url
+    });
+
+
+    const text = jsontext;
+    return text;
+
+}
+
+async function newchat(chatbot) {
+
 
     const bot = chatbots[chatbot];
 
@@ -126,17 +183,12 @@ async function wr(chatbot, value) {
         throw new Error("Chatbot not found");
     }
 
-    const jsontext = await send("wr", {
+    const jsontext = await send("newchat", {
         chatbot,
-        write_selector: bot.inputbox,
-        write_value: value,
-        send_selector: bot.btnsend,
-        read_selector: bot.textbox,
-        btnnosend: bot.btnnosend
+        url: bot.url
     });
     const text = jsontext;
     return text;
-
 }
 
 async function clickBySelector(selector) {
@@ -162,7 +214,12 @@ process.on("SIGINT", () => {
 
 });
 
+
+
+
 module.exports = {
     wr,
-    browserReady
+    browserReady,
+    newchat,
+    onewr
 };

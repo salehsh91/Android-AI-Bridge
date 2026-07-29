@@ -3,13 +3,15 @@
     "inputbox": "#prompt-textarea",
     "btnsend": "#composer-submit-button",
     "btnnosend": "[data-testid='stop-button']",
-    "textbox": "[data-turn-id-container]"
+    "textbox": "[data-turn-id-container]",
+    "url": "https://chatgpt.com/"
   },
 
   "deepseek": {
     "inputbox": "[placeholder='Message DeepSeek']",
     "btnsend": "div[role='button'].ds-button--primary",
     "btnnosend": ".ds-button--disabled",
-    "textbox": "div.ds-message"
+    "textbox": "div.ds-message",
+    "url": "https://chat.deepseek.com/"
   }
 }

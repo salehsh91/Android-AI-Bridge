@@ -1,4 +1,4 @@
-console.log("Content Loaded");
+console.log("Content Loaded", location.href);
 
 function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
@@ -167,7 +167,21 @@ async function readStable(selector = "div.ds-message", options = {}) {
 
     throw new Error("Message timeout");
 }
+async function waitSelector(selector, timeout = 30000) {
+    const start = Date.now();
 
+    while (Date.now() - start < timeout) {
+        const el = document.querySelector(selector);
+
+        if (el) {
+            return el;
+        }
+
+        await sleep(200);
+    }
+
+    throw new Error("Selector not found: " + selector);
+}
 async function read(selector, btnNoSend) {
     while (document.querySelector(btnNoSend) === null) {
         await sleep(300);
@@ -184,7 +198,31 @@ async function read(selector, btnNoSend) {
     return el.innerText ?? el.textContent ?? el.value ?? "";
 }
 
+async function getTabId() {
+    const response = await chrome.runtime.sendMessage({
+        type: "getTabId"
+    });
+
+    return response.tabId;
+}
+
+async function OneWR(data) {
+    const id = await getTabId();
+
+    if (id !== data.tabid || window.location.href !== data.url) {
+        return null;
+    }
+
+    const wr = await WR(data);
+
+    return {
+        wr: wr,
+        url: window.location.href
+    };
+}
+
 async function WR(data) {
+    await waitSelector(data.write_selector);
 
 
     console.log("WR Start");
@@ -243,6 +281,20 @@ async function WR(data) {
     return answer;
 }
 
+class Url {
+
+    static checkurl(url) {
+        if (window.location.href === url) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+    static seturl(url) {
+        window.location.href = url;
+    }
+}
+
 function run(code) {
 
     return eval(code);
@@ -250,8 +302,12 @@ function run(code) {
 }
 
 chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
-
+    console.log("Received:", data.type);
     console.log("Message:", data);
+
+    if (!Url.checkurl(data.url)) {
+        return;
+    }
 
     (async () => {
 
@@ -305,7 +361,7 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
 
                     break;
 
-                case "wr": {
+                case "wr":
 
                     const text = await WR(data);
 
@@ -316,8 +372,28 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
                     });
 
                     break;
-                }
+                case "onewr": {
 
+                    const req = await OneWR(data);
+
+                    if (!req) {
+                        sendResponse({
+                            id: data.id,
+                            ok: false,
+                            error: "Wrong tab"
+                        });
+                        return;
+                    }
+
+                    sendResponse({
+                        id: data.id,
+                        ok: true,
+                        text: req.wr,
+                        url: req.url
+                    });
+
+                    break;
+                }
                 default:
 
                     sendResponse({
@@ -344,4 +420,9 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
 
 });
 
+
 console.log("Content Script Ready");
+
+chrome.runtime.sendMessage({
+    type: "contentReady"
+});
