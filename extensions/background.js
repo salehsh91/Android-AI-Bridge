@@ -56,6 +56,9 @@ function connect() {
             case "deepseek":
                 url = "https://chat.deepseek.com/*";
                 break;
+            case "qwen":
+                url = "https://chat.qwen.ai/*";
+                break;
 
             default:
                 console.log("Unknown chatbot");

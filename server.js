@@ -199,6 +199,50 @@ async function clickBySelector(selector) {
 
 }
 
+async function imgcreator(chatbot,prompt,tabId,url){
+
+    console.log(
+        "SERVER imgcreator:",
+        chatbot,
+        prompt
+    );
+
+    const bot = chatbots[chatbot];
+
+    if (!bot) {
+        throw new Error("Chatbot not found");
+    }
+
+
+    const jsontext = await send("imgcreator", {
+
+        chatbot,
+
+        write_selector: bot.inputbox,
+        write_prompt: prompt,
+
+        send_selector: bot.btnsend,
+
+        img_selector: bot.imgbox,
+        boximg_selector: bot.boximg,
+
+        btnnosend: bot.btnnosend,
+
+
+        plus_selector: bot.options.btnplus,
+        options_selector: bot.options.btnoptions,
+        option_selector: Number(
+            bot.options.imgoptions.btnselector
+        ),
+
+
+        tabid: tabId,
+        url: url
+    });
+
+
+    return jsontext;
+}
 
 
 
@@ -221,5 +265,6 @@ module.exports = {
     wr,
     browserReady,
     newchat,
-    onewr
+    onewr,
+    imgcreator
 };

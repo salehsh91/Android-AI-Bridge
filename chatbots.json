@@ -6,12 +6,34 @@
     "textbox": "[data-turn-id-container]",
     "url": "https://chatgpt.com/"
   },
-
   "deepseek": {
     "inputbox": "[placeholder='Message DeepSeek']",
     "btnsend": "div[role='button'].ds-button--primary",
     "btnnosend": ".ds-button--disabled",
     "textbox": "div.ds-message",
     "url": "https://chat.deepseek.com/"
+  },
+  "qwen": {
+    "inputbox": "textarea.message-input-textarea",
+    "btnsend": ".send-button",
+    "btnnosend": "button.send-button.disabled",
+    "textbox": ".response-message-content",
+    "imgbox": "img.qwen-image",
+    "boximg": "qwen-markdown-image",
+
+    "url": "https://chat.qwen.ai/",
+
+    "options": {
+      "btnplus": "div.mode-select-open",
+      "btnoptions": "li.ant-dropdown-menu-item",
+
+      "imgoptions": {
+        "btnselector": "2",
+        "models": "none",
+        "aspect_ratio": "none"
+      }
+
+    }
   }
+
 }

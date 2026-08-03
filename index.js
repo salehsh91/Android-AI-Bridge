@@ -57,7 +57,34 @@ ${article}
     console.log(article); 
 }
 
+async function main(){
 
+    console.log("Waiting browser...");
+
+    await browserReady;
+
+    console.log("Browser ready");
+
+
+    const Qwen = new AI("qwen");
+
+
+    await Qwen.init();
+
+    console.log('end init');
+    const images = await Qwen.createimg(
+        "A futuristic robot in a technology laboratory"
+    );
+
+    // const images = await Qwen.ask('hello2');
+
+
+    console.log(
+        "Images:",
+        images
+    );
+
+}
 
 
 main().catch(console.error);

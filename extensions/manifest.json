@@ -9,6 +9,7 @@
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://chat.deepseek.com/*",
+    "https://chat.qwen.ai/*",
     "http://127.0.0.1/*"
   ],
   "background": {
@@ -18,7 +19,8 @@
     {
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://chat.qwen.ai/*"
       ],
       "js": [
         "content.js"

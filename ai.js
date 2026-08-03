@@ -1,44 +1,87 @@
-const {browserReady ,onewr ,newchat ,wr} = require("./server.js");
+const {
+    onewr,
+    newchat,
+    wr,
+    imgcreator
+} = require("./server.js");
 
 
 class AI {
 
     constructor(chatbot, prompt = "Hello", chat = "newchat") {
+
         this.chatbot = chatbot;
         this.version = "1.0";
+
+        this.tabid = null;
+        this.url = null;
+
     }
+
 
     async init() {
 
-        const tab = await newchat(this.chatbot);
-
+        const tab = await newchat(
+            this.chatbot
+        );
 
 
         this.tabid = tab.tabId;
-        const res = await onewr(
+        this.url = tab.url;
+
+
+        const req = await onewr(
             this.chatbot,
             "Hello",
             this.tabid,
-            tab.url
+            
         );
         
-        this.chatid = res.url;
 
+        this.url = req.url;
+
+        return this;
 
     }
 
 
+
     async ask(prompt) {
+
+        if(!this.tabid){
+            throw new Error("AI not initialized");
+        }
+
 
         const res = await wr(
             this.chatbot,
             prompt,
             this.tabid,
-            this.chatid
+            this.url
         );
 
+
         return res.text;
+
     }
+
+
+
+    async createimg(prompt){
+
+    console.log("Creating image:", prompt);
+
+    const res = await imgcreator(
+        this.chatbot,
+        prompt,
+        this.tabid,
+        this.url
+    );
+
+    console.log("Image result:", res);
+
+    return res;
+}
 
 }
 
