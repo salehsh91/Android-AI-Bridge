@@ -3,6 +3,25 @@ console.log("Content Loaded", location.href);
 function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
 }
+async function ErrorManager(data, controller) {
+
+    while (!controller.stop) {
+
+        const errorbox = document.querySelector(data.error_selector);
+
+        if (errorbox) {
+
+            const btn = document.querySelector(data.retry_selector);
+            btn?.click();
+
+            return false; // خطا پیدا شد
+        }
+
+        await sleep(1000);
+    }
+
+    return true; // بدون خطا متوقف شد
+}
 
 
 function clickById(id) {
@@ -57,6 +76,7 @@ function clickQwenSend(selector) {
 
     return true;
 }
+
 function write(selector, value) {
 
     const el = document.querySelector(selector);
@@ -109,6 +129,21 @@ function write(selector, value) {
 
 
     return true;
+}
+async function read(selector, btnNoSend) {
+    while (document.querySelector(btnNoSend) === null) {
+        await sleep(300);
+    }
+
+    const els = document.querySelectorAll(selector);
+
+    if (els.length === 0) {
+        return null;
+    }
+
+    const el = els[els.length - 1];
+
+    return el.innerText ?? el.textContent ?? el.value ?? "";
 }
 async function readStable(selector = "div.ds-message", options = {}) {
 
@@ -197,6 +232,7 @@ async function readStable(selector = "div.ds-message", options = {}) {
 
     throw new Error("Message timeout");
 }
+
 async function waitSelector(selector, timeout = 30000) {
     const start = Date.now();
 
@@ -305,21 +341,7 @@ async function waitForImages(data, timeout = Infinity) {
 
     });
 }
-async function read(selector, btnNoSend) {
-    while (document.querySelector(btnNoSend) === null) {
-        await sleep(300);
-    }
 
-    const els = document.querySelectorAll(selector);
-
-    if (els.length === 0) {
-        return null;
-    }
-
-    const el = els[els.length - 1];
-
-    return el.innerText ?? el.textContent ?? el.value ?? "";
-}
 async function getTabId() {
     const response = await chrome.runtime.sendMessage({
         type: "getTabId"
@@ -327,7 +349,10 @@ async function getTabId() {
 
     return response.tabId;
 }
+
+
 async function OneWR(data) {
+
 
     const tabId = await getTabId();
 
@@ -343,162 +368,228 @@ async function OneWR(data) {
     };
 }
 async function WR(data) {
-    await sleep(5000);
-    await waitSelector(data.write_selector);
+
+    while (true) {
+
+        const controller = {
+            stop: false
+        };
+
+        const errorTask = ErrorManager(data, controller);
+
+        try {
+
+            // تمام کارهای WR
+            await sleep(5000);
+            await waitSelector(data.write_selector);
 
 
-    console.log("WR Start");
+            console.log("WR Start");
 
 
-    const messages =
-        document.querySelectorAll(
-            data.read_selector
-        );
+            const messages =
+                document.querySelectorAll(
+                    data.read_selector
+                );
 
 
-    const oldText =
-        messages.length
-            ? messages[messages.length - 1]
-                .innerText
-                .trim()
-            : "";
+            const oldText =
+                messages.length
+                    ? messages[messages.length - 1]
+                        .innerText
+                        .trim()
+                    : "";
 
 
-    const ok = write(
-        data.write_selector,
-        data.write_value
-    );
+            const ok = write(
+                data.write_selector,
+                data.write_value
+            );
 
 
-    if (!ok) {
-        throw new Error("Write failed");
-    }
+            if (!ok) {
+                throw new Error("Write failed");
+            }
 
 
 
-    await sleep(1000);
+            await sleep(1000);
 
 
-    await clickBySelector(
-        data.send_selector
-    );
+            await clickBySelector(
+                data.send_selector
+            );
 
 
-    console.log("Waiting answer...");
+            console.log("Waiting answer...");
 
 
-    const answer = await readStable(
-        data.read_selector,
-        {
-            oldText: oldText,
-            timeout: 180000,
-            stableRounds: 4
+            const answer = await readStable(
+                data.read_selector,
+                {
+                    oldText: oldText,
+                    timeout: 180000,
+                    stableRounds: 4
+                }
+            );
+
+
+            console.log("Answer:", answer);
+
+
+            // کار تمام شد
+            controller.stop = true;
+
+            // منتظر خروج ErrorManager
+            await errorTask;
+
+            return answer;
+
+        } catch (e) {
+
+            controller.stop = true;
+            await errorTask;
+
+            throw e;
         }
-    );
 
+        // اگر ErrorManager false برگرداند
+        const ok = await errorTask;
 
-    console.log("Answer:", answer);
+        if (ok) {
+            return answer;
+        }
 
-
-    return answer;
+        console.log("Retry...");
+    }
 }
 async function imgCreator(data) {
 
-    console.log("img Creating...");
+    while (true) {
+
+        const controller = {
+            stop: false
+        };
+
+        const errorTask = ErrorManager(data, controller);
+
+        try {
+
+            console.log("img Creating...");
 
 
-    // باز کردن منوی ابزارها
-    await clickBySelector(
-        data.plus_selector
-    );
+            // باز کردن منوی ابزارها
+            await clickBySelector(
+                data.plus_selector
+            );
 
 
-    await sleep(500);
+            await sleep(500);
 
 
 
-    // انتخاب Image mode
+            // انتخاب Image mode
 
-    const options = document.querySelectorAll(
-        data.options_selector
-    );
+            const options = document.querySelectorAll(
+                data.options_selector
+            );
 
 
-    if (!options[data.option_selector]) {
+            if (!options[data.option_selector]) {
 
-        throw new Error(
-            "Image option not found"
-        );
+                throw new Error(
+                    "Image option not found"
+                );
 
+            }
+
+
+            options[data.option_selector].click();
+
+
+
+            await sleep(500);
+
+
+
+            // نوشتن prompt
+
+            const ok = write(
+                data.write_selector,
+                data.write_prompt
+            );
+
+
+            if (!ok) {
+
+                throw new Error(
+                    "Write failed"
+                );
+
+            }
+
+
+
+            await sleep(500);
+
+
+
+            // ارسال
+
+            await clickBySelector(
+                data.send_selector
+            );
+
+
+
+            console.log(
+                "Waiting for image..."
+            );
+
+
+
+            // انتظار عکس
+
+            const images = await waitForImages(
+                data
+            );
+
+
+
+            console.log(
+                "Images created:",
+                images
+            );
+
+
+            console.log(
+                "End creating"
+            );
+
+            await clickBySelector(data.close_selector);
+
+
+            return images;
+
+        } catch (e) {
+
+            controller.stop = true;
+            await errorTask;
+
+            throw e;
+        }
+
+        // اگر ErrorManager false برگرداند
+        const ok = await errorTask;
+
+        if (ok) {
+            return answer;
+        }
+
+        console.log("Retry...");
     }
-
-
-    options[data.option_selector].click();
-
-
-
-    await sleep(500);
-
-
-
-    // نوشتن prompt
-
-    const ok = write(
-        data.write_selector,
-        data.write_prompt
-    );
-
-
-    if (!ok) {
-
-        throw new Error(
-            "Write failed"
-        );
-
-    }
-
-
-
-    await sleep(500);
-
-
-
-    // ارسال
-
-    await clickBySelector(
-        data.send_selector
-    );
-
-
-
-    console.log(
-        "Waiting for image..."
-    );
-
-
-
-    // انتظار عکس
-
-    const images = await waitForImages(
-        data
-    );
-
-
-
-    console.log(
-        "Images created:",
-        images
-    );
-
-
-    console.log(
-        "End creating"
-    );
-
-
-    return images;
-
 }
+
 
 class Url {
 

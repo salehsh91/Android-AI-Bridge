@@ -1,0 +1,10 @@
+{
+    
+    "AIs": {
+        "img_creator": "qwen",
+        "article_creator": "deepseek",
+        "score_creator": "chatgpt",
+        "more": "chatgpt"
+    }
+    
+}

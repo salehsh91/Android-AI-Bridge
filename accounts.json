@@ -1,0 +1,8 @@
+{
+    "qwen":{
+        "account1":{
+            "email": "email",
+            "password": "pass"
+        }
+    }
+}
