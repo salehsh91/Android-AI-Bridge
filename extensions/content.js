@@ -3,6 +3,7 @@ console.log("Content Loaded", location.href);
 function sleep(ms) {
     return new Promise(r => setTimeout(r, ms));
 }
+
 async function ErrorManager(data, controller) {
 
     while (!controller.stop) {
@@ -23,7 +24,6 @@ async function ErrorManager(data, controller) {
     return true; // بدون خطا متوقف شد
 }
 
-
 function clickById(id) {
     const el = document.getElementById(id);
 
@@ -33,6 +33,7 @@ function clickById(id) {
 
     return true;
 }
+
 function clickBySelector(selector) {
     const el = document.querySelector(selector);
 
@@ -42,6 +43,7 @@ function clickBySelector(selector) {
 
     return true;
 }
+
 function clickQwenSend(selector) {
 
     const btn = document.querySelector(selector);
@@ -51,9 +53,7 @@ function clickQwenSend(selector) {
         return false;
     }
 
-
     btn.focus();
-
 
     btn.dispatchEvent(new PointerEvent("pointerdown", {
         bubbles: true,
@@ -73,7 +73,6 @@ function clickQwenSend(selector) {
         cancelable: true
     }));
 
-
     return true;
 }
 
@@ -86,11 +85,9 @@ function write(selector, value) {
         return false;
     }
 
-
     el.focus();
 
-
-    // ContentEditable (ChatGPT)
+    // ContentEditable (ChatGPT, Qwen chat input, etc.)
     if (el.isContentEditable) {
 
         el.innerHTML = "";
@@ -100,7 +97,6 @@ function write(selector, value) {
 
         el.appendChild(p);
 
-
         el.dispatchEvent(new InputEvent("input", {
             bubbles: true,
             inputType: "insertText",
@@ -108,30 +104,53 @@ function write(selector, value) {
         }));
 
     }
+    // Textarea (DeepSeek, etc.)
+    else if (el.tagName === 'TEXTAREA') {
 
-    // textarea (DeepSeek)
-    else {
-
-        const setter =
-            Object.getOwnPropertyDescriptor(
-                HTMLTextAreaElement.prototype,
-                "value"
-            ).set;
-
+        const setter = Object.getOwnPropertyDescriptor(
+            HTMLTextAreaElement.prototype,
+            "value"
+        ).set;
 
         setter.call(el, value);
-
 
         el.dispatchEvent(new Event("input", {
             bubbles: true
         }));
     }
+    // Input (Email, Password, Text, etc. like Qwen login)
+    else if (el.tagName === 'INPUT') {
 
+        const setter = Object.getOwnPropertyDescriptor(
+            HTMLInputElement.prototype,
+            "value"
+        ).set;
+
+        setter.call(el, value);
+
+        el.dispatchEvent(new Event("input", {
+            bubbles: true
+        }));
+    }
+    // Fallback
+    else {
+        el.value = value;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
 
     return true;
 }
-async function read(selector, btnNoSend) {
+
+async function read(selector, btnNoSend, timeout = 60000) {
+
+    const start = Date.now();
+
     while (document.querySelector(btnNoSend) === null) {
+
+        if (Date.now() - start > timeout) {
+            throw new Error("read timeout: " + btnNoSend);
+        }
+
         await sleep(300);
     }
 
@@ -145,6 +164,7 @@ async function read(selector, btnNoSend) {
 
     return el.innerText ?? el.textContent ?? el.value ?? "";
 }
+
 async function readStable(selector = "div.ds-message", options = {}) {
 
     const {
@@ -154,19 +174,15 @@ async function readStable(selector = "div.ds-message", options = {}) {
         oldText = ""
     } = options;
 
-
     const start = Date.now();
 
     let lastText = "";
     let stable = 0;
     let started = false;
 
-
     while (Date.now() - start < timeout) {
 
-
         const messages = document.querySelectorAll(selector);
-
 
         if (messages.length) {
 
@@ -186,8 +202,6 @@ async function readStable(selector = "div.ds-message", options = {}) {
                 stable
             );
 
-
-            // هنوز همان جواب قبلی است
             if (!started) {
 
                 if (
@@ -200,17 +214,12 @@ async function readStable(selector = "div.ds-message", options = {}) {
 
             } else {
 
-
-                // متن تغییر کرده
                 if (current !== lastText) {
 
                     lastText = current;
                     stable = 0;
 
-                }
-
-                // متن ثابت مانده
-                else {
+                } else {
 
                     stable++;
 
@@ -223,12 +232,10 @@ async function readStable(selector = "div.ds-message", options = {}) {
             }
         }
 
-
         await new Promise(
             r => setTimeout(r, interval)
         );
     }
-
 
     throw new Error("Message timeout");
 }
@@ -248,31 +255,14 @@ async function waitSelector(selector, timeout = 30000) {
 
     throw new Error("Selector not found: " + selector);
 }
+
 async function waitForImages(data, timeout = Infinity) {
 
     return new Promise((resolve, reject) => {
 
         const start = Date.now();
 
-
         function check() {
-
-            const boxs1 = document.querySelectorAll(
-                data.boximg_selector
-            );
-
-            const imgs1 = [...document.querySelectorAll(
-                data.img_selector
-            )];
-
-
-            console.log("IMAGE CHECK", {
-                boxSelector: data.boximg_selector,
-                imgSelector: data.img_selector,
-                boxes: boxs1.length,
-                images: imgs1.length,
-                srcs: imgs1.map(x => x.src)
-            });
 
             const boxs = document.querySelectorAll(
                 data.boximg_selector
@@ -282,6 +272,13 @@ async function waitForImages(data, timeout = Infinity) {
                 data.img_selector
             )];
 
+            console.log("IMAGE CHECK", {
+                boxSelector: data.boximg_selector,
+                imgSelector: data.img_selector,
+                boxes: boxs.length,
+                images: imgs.length,
+                srcs: imgs.map(x => x.src)
+            });
 
             const ready =
                 boxs.length > 0 &&
@@ -290,7 +287,6 @@ async function waitForImages(data, timeout = Infinity) {
                     img.src &&
                     img.src.startsWith("http")
                 );
-
 
             if (ready) {
 
@@ -301,7 +297,6 @@ async function waitForImages(data, timeout = Infinity) {
                 resolve(urls);
                 return true;
             }
-
 
             if (timeout !== Infinity && Date.now() - start > timeout) {
 
@@ -314,13 +309,10 @@ async function waitForImages(data, timeout = Infinity) {
                 return true;
             }
 
-
             return false;
         }
 
-
         if (check()) return;
-
 
         const observer = new MutationObserver(() => {
 
@@ -329,7 +321,6 @@ async function waitForImages(data, timeout = Infinity) {
             }
 
         });
-
 
         observer.observe(
             document.body,
@@ -350,9 +341,7 @@ async function getTabId() {
     return response.tabId;
 }
 
-
 async function OneWR(data) {
-
 
     const tabId = await getTabId();
 
@@ -367,6 +356,7 @@ async function OneWR(data) {
         url: window.location.href
     };
 }
+
 async function WR(data) {
 
     while (true) {
@@ -379,19 +369,15 @@ async function WR(data) {
 
         try {
 
-            // تمام کارهای WR
             await sleep(5000);
             await waitSelector(data.write_selector);
 
-
             console.log("WR Start");
-
 
             const messages =
                 document.querySelectorAll(
                     data.read_selector
                 );
-
 
             const oldText =
                 messages.length
@@ -400,29 +386,22 @@ async function WR(data) {
                         .trim()
                     : "";
 
-
             const ok = write(
                 data.write_selector,
                 data.write_value
             );
 
-
             if (!ok) {
                 throw new Error("Write failed");
             }
 
-
-
             await sleep(1000);
-
 
             await clickBySelector(
                 data.send_selector
             );
 
-
             console.log("Waiting answer...");
-
 
             const answer = await readStable(
                 data.read_selector,
@@ -433,14 +412,10 @@ async function WR(data) {
                 }
             );
 
-
             console.log("Answer:", answer);
 
-
-            // کار تمام شد
             controller.stop = true;
 
-            // منتظر خروج ErrorManager
             await errorTask;
 
             return answer;
@@ -452,17 +427,9 @@ async function WR(data) {
 
             throw e;
         }
-
-        // اگر ErrorManager false برگرداند
-        const ok = await errorTask;
-
-        if (ok) {
-            return answer;
-        }
-
-        console.log("Retry...");
     }
 }
+
 async function imgCreator(data) {
 
     while (true) {
@@ -477,23 +444,15 @@ async function imgCreator(data) {
 
             console.log("img Creating...");
 
-
-            // باز کردن منوی ابزارها
             await clickBySelector(
                 data.plus_selector
             );
 
-
             await sleep(500);
-
-
-
-            // انتخاب Image mode
 
             const options = document.querySelectorAll(
                 data.options_selector
             );
-
 
             if (!options[data.option_selector]) {
 
@@ -503,71 +462,45 @@ async function imgCreator(data) {
 
             }
 
-
             options[data.option_selector].click();
 
-
-
             await sleep(500);
-
-
-
-            // نوشتن prompt
 
             const ok = write(
                 data.write_selector,
                 data.write_prompt
             );
 
-
             if (!ok) {
 
-                throw new Error(
-                    "Write failed"
-                );
+                throw new Error("Write failed");
 
             }
 
-
-
             await sleep(500);
-
-
-
-            // ارسال
 
             await clickBySelector(
                 data.send_selector
             );
 
-
-
             console.log(
                 "Waiting for image..."
             );
 
-
-
-            // انتظار عکس
-
             const images = await waitForImages(
                 data
             );
-
-
 
             console.log(
                 "Images created:",
                 images
             );
 
-
             console.log(
                 "End creating"
             );
 
             await clickBySelector(data.close_selector);
-
 
             return images;
 
@@ -578,18 +511,33 @@ async function imgCreator(data) {
 
             throw e;
         }
-
-        // اگر ErrorManager false برگرداند
-        const ok = await errorTask;
-
-        if (ok) {
-            return answer;
-        }
-
-        console.log("Retry...");
     }
 }
 
+async function LoginOut(data) {
+    console.log("start login out");
+    await sleep(2000);
+    document.querySelector(data.profile_selector)?.click();
+    await sleep(1000);
+    const btn = [...document.querySelectorAll(data.btnsprofile_selector)].at(Number(data.btnprofile_length));
+    if (btn) {
+        btn.click();
+        console.log("LoginOut");
+        return true;
+
+    } else { console.log("no btn"); return false; }
+}
+
+async function login(data) {
+    await sleep(2000);
+    clickBySelector(data.loginpanel_selector);
+    await sleep(3000);
+    if (!write(data.email_selector, data.email)) throw new Error("1 Write failed!");
+    if (!write(data.pass_selector, data.password)) throw new Error("2 Write failed!");
+    await sleep(1000);
+    clickBySelector(data.login_selector);
+    return true;
+}
 
 class Url {
 
@@ -615,12 +563,14 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
     console.log("Received:", data.type);
     console.log("Message:", data);
 
-    if (data.url && !Url.checkurl(data.url)) {
-        sendResponse({
-            ok: false,
-            error: "Wrong url"
-        });
-        return;
+    if (data.type !== "login") {
+        if (data.url && !Url.checkurl(data.url)) {
+            sendResponse({
+                ok: false,
+                error: "Wrong url"
+            });
+            return;
+        }
     }
 
     (async () => {
@@ -675,7 +625,7 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
 
                     break;
 
-                case "wr":
+                case "wr": {
 
                     const text = await WR(data);
 
@@ -686,6 +636,8 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
                     });
 
                     break;
+                }
+
                 case "onewr": {
 
                     const req = await OneWR(data);
@@ -696,6 +648,7 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
                             ok: false,
                             error: "Wrong tab"
                         });
+
                         return;
                     }
 
@@ -709,7 +662,7 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
                     break;
                 }
 
-                case "imgcreator":
+                case "imgcreator": {
 
                     console.log("IMG COMMAND RECEIVED");
                     const imgurl = await imgCreator(data);
@@ -719,7 +672,36 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
                         ok: true,
                         imgurl
                     });
+
                     break;
+                }
+
+                case "loginout": {
+
+                    const ok = await LoginOut(data);
+
+                    sendResponse({
+                        id: data.id,
+                        ok: true,
+                        ok2: ok
+                    });
+
+                    break;
+                }
+
+                case "login": {
+
+                    const loginn = await login(data);
+
+                    sendResponse({
+                        id: data.id,
+                        ok: true,
+                        ok2: loginn
+                    });
+
+                    break;
+                }
+
                 default:
 
                     sendResponse({
@@ -746,10 +728,8 @@ chrome.runtime.onMessage.addListener((data, sender, sendResponse) => {
 
 });
 
-
 console.log("Content Script Ready");
 
 chrome.runtime.sendMessage({
     type: "contentReady"
 });
-
